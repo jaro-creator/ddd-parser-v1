@@ -1,4 +1,5 @@
 streamlit
 tacho==0.8.8
-construct
+py-ddd-parser
 pandas
+construct
