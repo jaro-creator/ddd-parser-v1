@@ -1,65 +1,52 @@
 import streamlit as st
-import os
-import subprocess
-import sys
+import tacho
 import tempfile
+import os
+import pandas as pd
 
-# --- AUTOMATICKÉ STIAHNUTIE KNIŽNICE ---
-def prepare_library():
-    if not os.path.exists("tachoparser"):
-        st.info("Pripravujem prostredie (sťahujem parser)...")
-        # Stiahneme len priečinok tachoparser z GitHubu
-        subprocess.run(["git", "clone", "https://github.com/traconiq/tachoparser.git", "temp_repo"])
-        # Presunieme dôležitý priečinok do hlavného adresára
-        os.rename("temp_repo/tachoparser", "./tachoparser")
-        # Upraceme
-        subprocess.run(["rm", "-rf", "temp_repo"])
-        st.rerun()
+# Nastavenie stránky
+st.set_page_config(page_title="Tacho Explorer", layout="wide")
 
-prepare_library()
+st.title("🚛 Python Tacho Parser")
+st.write("Nahrajte `.ddd` súbor a okamžite uvidíte výsledky.")
 
-from tachoparser import Tachoparser
-
-# --- INTERFACE APLIKÁCIE ---
-st.set_page_config(page_title="TachoParser Online", layout="centered")
-
-st.title("🚛 Digitálny Tachograf Parser")
-st.write("Nahrajte súbor `.ddd` pre rýchlu analýzu dát.")
-
-uploaded_file = st.file_uploader("Vyberte súbor", type=["ddd"])
+uploaded_file = st.file_uploader("Vyberte súbor (karta vodiča)", type=["ddd"])
 
 if uploaded_file:
-    # Vytvorenie dočasného súboru
+    # 1. Uloženie do dočasného súboru
     with tempfile.NamedTemporaryFile(delete=False, suffix=".ddd") as tmp:
         tmp.write(uploaded_file.getvalue())
         tmp_path = tmp.name
 
     try:
-        with st.spinner('Spracúvam...'):
-            # Inicializácia parsera
-            tc = Tachoparser(tmp_path)
-            data = tc.parse()
+        with st.spinner('Analyzujem...'):
+            # 2. Parsovanie pomocou knižnice tacho
+            obj = tacho.parse(tmp_path)
+            
+            # Pre účely zobrazenia to prevedieme na slovník (JSON)
+            data = obj.to_dict()
 
-            st.success("Analýza dokončená!")
-            
-            # Zobrazenie výsledkov v prehľadných kartách
-            col1, col2 = st.columns(2)
-            
-            # Skúsime vytiahnuť základné info (štruktúra závisí od obsahu .ddd)
-            with col1:
-                st.subheader("Identifikácia")
-                st.write(f"Súbor: `{uploaded_file.name}`")
-            
-            st.divider()
-            with st.expander("Zobraziť kompletné JSON dáta"):
-                st.json(data)
+        st.success(f"Súbor {uploaded_file.name} bol úspešne spracovaný.")
+
+        # 3. Rozhranie s kartami
+        tab1, tab2 = st.tabs(["📊 Prehľad", "🔍 Surové JSON dáta"])
+
+        with tab1:
+            st.subheader("Základné informácie")
+            # Skúsime nájsť meno vodiča v štruktúre
+            # Poznámka: Štruktúra sa líši podľa typu súboru (vodič vs vozidlo)
+            st.write("Dáta boli úspešne načítané do pamäte.")
+            st.info("Knižnica 'tacho' rozpoznala štruktúru súboru.")
+
+        with tab2:
+            st.json(data)
 
     except Exception as e:
-        st.error(f"Chyba pri analýze: {e}")
-        st.info("Tip: Uistite sa, že ide o platný .ddd súbor z karty vodiča alebo tachografu.")
+        st.error(f"Chyba pri čítaní: {e}")
     finally:
+        # 4. Upratanie dočasného súboru
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Beží na Streamlit Cloud | Engine: traconiq/tachoparser")
+st.sidebar.write("Použitá knižnica: `tacho` (Python native)")
