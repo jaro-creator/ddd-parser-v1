@@ -4,49 +4,53 @@ import tempfile
 import os
 import pandas as pd
 
-# Nastavenie stránky
-st.set_page_config(page_title="Tacho Explorer", layout="wide")
+# Nastavenie vzhľadu
+st.set_page_config(page_title="Tacho Parser", layout="wide", page_icon="🚛")
 
-st.title("🚛 Python Tacho Parser")
-st.write("Nahrajte `.ddd` súbor a okamžite uvidíte výsledky.")
+st.title("🚛 Profesionálny DDD Parser (Python)")
+st.info("Nahrajte súbor .ddd a systém ho automaticky spracuje.")
 
-uploaded_file = st.file_uploader("Vyberte súbor (karta vodiča)", type=["ddd"])
+uploaded_file = st.file_uploader("Vyberte .ddd súbor", type=["ddd"])
 
 if uploaded_file:
-    # 1. Uloženie do dočasného súboru
+    # Vytvorenie dočasného súboru
     with tempfile.NamedTemporaryFile(delete=False, suffix=".ddd") as tmp:
         tmp.write(uploaded_file.getvalue())
         tmp_path = tmp.name
 
     try:
-        with st.spinner('Analyzujem...'):
-            # 2. Parsovanie pomocou knižnice tacho
-            obj = tacho.parse(tmp_path)
-            
-            # Pre účely zobrazenia to prevedieme na slovník (JSON)
-            data = obj.to_dict()
+        with st.spinner('Analyzujem súbor...'):
+            # OPRAVA: Knižnica tacho používa parse_file
+            # Ak by nefungovalo, vyskúšame alternatívny prístup nižšie
+            try:
+                data_obj = tacho.parse_file(tmp_path)
+                data = data_obj.to_dict()
+            except AttributeError:
+                # Niektoré verzie tacho vyžadujú otvorenie súboru
+                with open(tmp_path, 'rb') as f:
+                    data = tacho.parse(f.read()).to_dict()
 
-        st.success(f"Súbor {uploaded_file.name} bol úspešne spracovaný.")
+        st.success("Dáta boli úspešne načítané!")
 
-        # 3. Rozhranie s kartami
-        tab1, tab2 = st.tabs(["📊 Prehľad", "🔍 Surové JSON dáta"])
+        # Zobrazenie výsledkov
+        tab1, tab2 = st.tabs(["📊 Prehľad", "🔍 Surové dáta (JSON)"])
 
         with tab1:
-            st.subheader("Základné informácie")
-            # Skúsime nájsť meno vodiča v štruktúre
-            # Poznámka: Štruktúra sa líši podľa typu súboru (vodič vs vozidlo)
-            st.write("Dáta boli úspešne načítané do pamäte.")
-            st.info("Knižnica 'tacho' rozpoznala štruktúru súboru.")
+            st.subheader("Identifikácia")
+            # Skúsime dynamicky vypísať kľúčové polia
+            if 'card_number' in data:
+                st.write(f"**Číslo karty:** {data['card_number']}")
+            
+            st.warning("Pre detailný rozpis aktivít rozbalte kartu Surové dáta.")
 
         with tab2:
             st.json(data)
 
     except Exception as e:
-        st.error(f"Chyba pri čítaní: {e}")
+        st.error(f"Chyba pri spracovaní: {e}")
+        st.info("Skontrolujte, či je súbor platný .ddd súbor.")
     finally:
-        # 4. Upratanie dočasného súboru
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-st.sidebar.markdown("---")
-st.sidebar.write("Použitá knižnica: `tacho` (Python native)")
+st.sidebar.caption("Verzia 2.0 | Engine: Python Tacho")
