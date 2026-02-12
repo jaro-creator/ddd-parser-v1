@@ -1,28 +1,44 @@
 import streamlit as st
-from tachoparser import Tachoparser
-import tempfile
 import os
+import tempfile
 
-st.title("Tachoparser Web App 🚛")
-st.write("Nahrajte .ddd súbor a získajte dáta v čitateľnom formáte.")
+# Pokus o import knižnice s kontrolou
+try:
+    from tachoparser import Tachoparser
+    LIB_READY = True
+except ImportError:
+    LIB_READY = False
 
-uploaded_file = st.file_uploader("Vyberte .ddd súbor", type=["ddd"])
+st.set_page_config(page_title="Tachoparser UI", layout="wide")
 
-if uploaded_file is not None:
-    # Uloženie do dočasného súboru, pretože tachoparser potrebuje cestu k súboru
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".ddd") as tmp:
-        tmp.write(uploaded_file.getvalue())
-        tmp_path = tmp.name
+st.title("🚛 DDD Parser (Tachoparser)")
 
-    try:
-        # Inicializácia a parsovanie
-        parser = Tachoparser(tmp_path)
-        data = parser.parse()
+if not LIB_READY:
+    st.error("❌ Knižnica 'tachoparser' nie je nainštalovaná. Skontrolujte requirements.txt a Logs.")
+    st.info("V requirements.txt by malo byť: git+https://github.com/traconiq/tachoparser.git")
+else:
+    st.success("✅ Systém je pripravený na analýzu súborov.")
+    
+    uploaded_file = st.file_uploader("Nahrajte .ddd súbor (karta vodiča alebo vozidlo)", type=["ddd"])
 
-        st.success("Súbor úspešne spracovaný!")
-        st.json(data) # Zobrazí surové JSON dáta
-        
-    except Exception as e:
-        st.error(f"Chyba pri spracovaní: {e}")
-    finally:
-        os.remove(tmp_path)
+    if uploaded_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".ddd") as tmp:
+            tmp.write(uploaded_file.getvalue())
+            tmp_path = tmp.name
+
+        try:
+            with st.spinner('Analyzujem dáta...'):
+                parser = Tachoparser(tmp_path)
+                data = parser.parse()
+            
+            st.divider()
+            st.subheader("Výsledok analýzy (JSON)")
+            st.json(data)
+            
+        except Exception as e:
+            st.error(f"Chyba pri spracovaní súboru: {e}")
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+st.sidebar.info("Tento nástroj používa knižnicu traconiq/tachoparser na dekódovanie digitálnych tachografov.")
